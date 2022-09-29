@@ -31,4 +31,5 @@ urlpatterns = [
     # reserve `polls` namespace for polls urls in CMS
     path('polls/', include('polls.urls', namespace='app_polls')),
     path('cms/', include(frontend_urls)),
+    path('s3direct/', include('s3direct.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'storages',
+    's3direct',
 ]
 
 MIDDLEWARE = [
@@ -176,16 +177,51 @@ else:
     # as defined in django/conf/global_settings.py
     pass
 
+FILE_UPLOAD_MAX_SIZE = 2.5 * 1024**2  # i.e. 2.5 MB
+# FILE_UPLOAD_MAX_SIZE = 10 * 1024**3  # i.e. 10 MB
+
 # Amazon S3 settings
 # https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html
 
 AWS_STORAGE_BUCKET_NAME = str(os.getenv('AWS_STORAGE_BUCKET_NAME'))
 AWS_S3_REGION_NAME = str(os.getenv('AWS_S3_REGION_NAME'))
-AWS_S3_ACCESS_KEY_ID = str(os.getenv('AWS_S3_ACCESS_KEY_ID'))
-AWS_S3_SECRET_ACCESS_KEY = str(os.getenv('AWS_S3_SECRET_ACCESS_KEY'))
+AWS_S3_ENDPOINT_URL = str(os.getenv('AWS_S3_ENDPOINT_URL'))
+
+AWS_ACCESS_KEY_ID = str(os.getenv('AWS_S3_ACCESS_KEY_ID'))
+AWS_SECRET_ACCESS_KEY = str(os.getenv('AWS_S3_SECRET_ACCESS_KEY'))
 AWS_S3_FILE_OVERWRITE = (str(os.getenv('AWS_S3_FILE_OVERWRITE')).lower()
                          in ['true', 'yes', '1'])
 AWS_LOCATION = str(os.getenv('AWS_LOCATION'))
+
+# S3 direct settings
+# https://github.com/bradleyg/django-s3direct#settingspy
+
+S3DIRECT_DESTINATIONS = {
+    'document': {
+        'key': AWS_LOCATION,
+        'auth': lambda u: u.is_staff,
+        'acl': 'private',
+        'content_length_range': (0, FILE_UPLOAD_MAX_SIZE),
+    },
+    'image': {
+        'key': AWS_LOCATION,
+        'auth': lambda u: u.is_staff,
+        'allowed': [
+            'image/avif',
+            'image/bmp',
+            'image/gif',
+            'image/jpeg',
+            'image/png',
+            'image/svg+xml',
+            'image/tiff',
+            'image/vnd.microsoft.icon',
+            'image/webp',
+        ],
+        'acl': 'private',
+        'content_length_range': (0, FILE_UPLOAD_MAX_SIZE),
+    },
+}
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field

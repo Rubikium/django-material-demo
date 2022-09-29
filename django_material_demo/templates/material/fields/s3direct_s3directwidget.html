@@ -1,0 +1,14 @@
+<div class="row">
+    <div class="input-field col s12{% if field.required %} required{% endif %}{% if bound_field.errors %} has-error{% endif %}">
+        {% comment %}
+        # TODO: use material UI without breaking functionality
+        {% endcomment %}
+        {{ bound_field }}
+        <label for="{{ bound_field.id_for_label }}" class="active"
+        >{{ bound_field.label }}</label>
+        {% if field.help_text %}
+        <div class="help-block">{{ bound_field.help_text|safe }}</div>
+        {% endif %}
+        {% if bound_field.errors %}{% include 'material/field_errors.html' %}{% endif %}
+    </div>
+</div>

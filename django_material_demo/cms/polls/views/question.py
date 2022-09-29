@@ -1,5 +1,4 @@
 from django import forms
-from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.forms import (BaseInlineFormSet, BooleanField, FileField,
                           ImageField, ModelForm)
@@ -16,18 +15,38 @@ from polls.models import Attachment, Choice, Question, QuestionFollower
 from ...utils import (FieldDataMixin, FormSetForm, GetParamAsFormDataMixin,
                       ListFilterView, NestedModelFormField, SearchAndFilterSet,
                       get_html_list)
+from ...utils.forms import FileS3UploadField
 
 
 class AttachmentsForm(FormSetForm):
-    file = FileField(label="Attachment",
-                     max_length=settings.FILE_UPLOAD_MAX_MEMORY_SIZE)
+    # If using local storage
+    # file = FileField(label='Attachment',
+    #                  max_length=settings.FILE_UPLOAD_MAX_SIZE)
 
-    layout = Layout('file')
+    # if using S3 storage
+    file_upload = FileS3UploadField(dest='document', label='Attachment')
+
+    layout = Layout(
+        # 'file',
+        'file_upload')
     parent_instance_field = 'question'
 
     class Meta:
         model = Attachment
         fields = ['file']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.id:
+            if self.instance.file:
+                self.initial["file_upload"] = self.instance.file.url
+
+    def save(self, commit=True):
+        instance = super().save(commit)
+        instance.file = self.cleaned_data['file_upload']
+        instance.save()
+        return instance
 
 
 class QuestionFollowersForm(FormSetForm):
@@ -99,8 +118,13 @@ class MaxVoteCountForm(ModelForm, FieldDataMixin):
 
 
 class QuestionForm(SuperModelForm):
-    thumbnail = ImageField(required=False, label='Thumbnail',
-                           max_length=settings.FILE_UPLOAD_MAX_MEMORY_SIZE)
+    # If using local storage
+    # thumbnail = ImageField(required=False, label='Thumbnail',
+    #                        max_length=settings.FILE_UPLOAD_MAX_SIZE)
+
+    # If using S3 storage
+    thumbnail_upload = FileS3UploadField(dest='image', required=False)
+
     max_vote_count_control = NestedModelFormField(MaxVoteCountForm)
 
     # Formset fields
@@ -119,7 +143,8 @@ class QuestionForm(SuperModelForm):
 
     layout = Layout(
         'question_text',
-        Row('total_vote_count', 'thumbnail'),
+        Row('total_vote_count', 'thumbnail_upload'),
+        # 'thumbnail',
         Row('creator', 'show_creator'),
         'attachments',
         'q_followers',
@@ -149,6 +174,9 @@ class QuestionForm(SuperModelForm):
         self.formsets["choices"].header = 'Choices'
 
         if self.instance and self.instance.id:
+            if self.instance.thumbnail:
+                self.initial["thumbnail_upload"] = self.instance.thumbnail.url
+
             attachments_queryset = self.instance.attachment_set.all()
             self.initial["attachments"] = attachments_queryset
             self.formsets["attachments"].queryset = attachments_queryset
@@ -242,13 +270,23 @@ class QuestionForm(SuperModelForm):
                 params={'len': error_count}
             ))
 
+    def save(self, commit=True):
+        instance = super().save(commit)
+        instance.thumbnail = self.cleaned_data['thumbnail_upload']
+        instance.save()
+        return instance
+
 
 class QuestionCreateView(CreateModelView, GetParamAsFormDataMixin):
+    template_name = 'cms_polls/forms/question_form.html'
+
     def get_form_class(self):
         return QuestionForm
 
 
 class QuestionUpdateView(UpdateModelView, GetParamAsFormDataMixin):
+    template_name = 'cms_polls/forms/question_form.html'
+
     def get_form_class(self):
         return QuestionForm
 
@@ -286,7 +324,7 @@ class QuestionDetailView(DetailModelView):
             if item[0] == thumbnail_name:
                 # Skip if no image
                 if item[1]:
-                    #TODO: replace with template
+                    # TODO: replace with template
                     image_html = mark_safe(
                         f"<img class='thumbnail' src='{item[1].url}' "
                         f"alt='{item[1].name}'>")
@@ -298,7 +336,7 @@ class QuestionDetailView(DetailModelView):
 
         attachments = question.attachment_set.all()
         if len(attachments):
-            #TODO: replace with template
+            # TODO: replace with template
             attachments = [
                 mark_safe(f"<a href='{x.file.url}'>{x.file.name}</a>")
                 for x in attachments]
